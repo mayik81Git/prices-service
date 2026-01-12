@@ -1,0 +1,99 @@
+spring:
+  # 1. CONFIGURACIÓN DE PERSISTENCIA (POSTGRESQL)
+  # Se eliminan configuraciones en memoria. Los valores se inyectan desde el orquestador (K8s/Vault).
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+    # HikariCP: Pool de conexiones optimizado para alta carga empresarial.
+    hikari:
+      pool-name: PricesService-ProdPool
+      # Capacidad para manejar ráfagas de tráfico masivo (ajustable según cores de la DB).
+      maximum-pool-size: 50
+      # Mantiene conexiones calientes listas para evitar latencia de apertura.
+      minimum-idle: 20
+      # Tiempo máximo de espera para obtener una conexión antes de lanzar error (30s).
+      connection-timeout: 30000
+      # Evita conexiones "zombis" en el cortafuegos de la red.
+      max-lifetime: 1200000
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # URL del servidor de identidad (Keycloak/Auth0) que firma los tokens
+          issuer-uri: ${AUTH_ISSUER_URI:auth.ecommerce.com}
+          # Opcionalmente, la clave pública para validar la firma sin conexión externa
+          jwk-set-uri: ${AUTH_JWK_SET_URI}
+  sql:
+    init:
+      mode: never # Desactiva la inicialización clásica de Spring para evitar conflictos
+  # 2. CONFIGURACIÓN JPA / HIBERNATE
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    # SEGURIDAD: Flyway gestiona el esquema; Hibernate solo valida que coincida.
+    hibernate:
+      ddl-auto: validate
+    # RENDIMIENTO: Desactivado para evitar overhead de I/O y logs masivos.
+    show-sql: false
+    open-in-view: false # Libera la conexión a la DB inmediatamente tras el servicio.
+
+  # 3. FLYWAY - CONTROL DE VERSIONES DE DB
+  flyway:
+    enabled: true
+    # Asegura que el historial de migraciones sea coherente y no permita cambios manuales.
+    baseline-on-migrate: true
+    check-location: true
+
+# 4. RESILIENCIA Y TOLERANCIA A FALLOS (RESILIENCE4J)
+# Configurado para proteger el microservicio ante saturación o fallos de la DB.
+resilience4j:
+  # Circuit Breaker: Evita el colapso en cascada si la base de datos se ralentiza.
+  circuitbreaker:
+    instances:
+      priceService:
+        registerHealthIndicator: true
+        slidingWindowSize: 100        # Analiza las últimas 100 llamadas.
+        failureRateThreshold: 50      # Abre el circuito si el 50% fallan o son lentas.
+        waitDurationInOpenState: 30s # Tiempo de recuperación antes de reintentar.
+  # Bulkhead: Aísla recursos para que una ráfaga de consultas no agote los hilos del servidor.
+  bulkhead:
+    instances:
+      priceService:
+        maxConcurrentCalls: 100       # Límite de ejecuciones paralelas para el servicio de precios.
+        maxWaitDuration: 1s           # Tiempo máximo de espera en cola antes de descartar.
+
+# 5. CONFIGURACIÓN DEL SERVIDOR WEB
+server:
+  port: 8080
+  shutdown: graceful # Permite finalizar peticiones en curso antes de apagar el pod (K8s).
+  # SEGURIDAD: Ofuscación de errores para evitar ingeniería inversa por parte de atacantes.
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+# 6. OBSERVABILIDAD (SPRING ACTUATOR & MICROMETER)
+# Fundamental para el monitoreo por el equipo de SRE mediante Prometheus/Grafana.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      # Liveness y Readiness probes para orquestación en Kubernetes.
+      probes:
+        enabled: true
+      show-details: when_authorized # Solo visible para herramientas de monitoreo internas.
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# 7. LOGGING EMPRESARIAL
+logging:
+  level:
+    root: INFO
+    com.ecommerce.prices_service: WARN # Solo advertencias y errores en producción para ahorrar disco.
