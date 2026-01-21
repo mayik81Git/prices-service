@@ -6,6 +6,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -25,24 +26,22 @@ import javax.crypto.spec.SecretKeySpec;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    // Clave secreta para validación de tokens en entorno local/desarrollo
-    private final String MOCK_SECRET = "esta-es-una-clave-secreta-de-32-caracteres-minimo";
+    // En producción esto vendría de un Secret de Kubernetes o Vault
+    private final String JWT_SECRET = "esta-es-una-clave-secreta-de-32-caracteres-minimo";
 
-    /**
-     * Define la cadena de filtros de seguridad.
-     *
-     * @param http Configuración de seguridad web.
-     * @return Filtro de seguridad configurado.
-     * @throws Exception Si ocurre un error en la configuración.
-     */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(AbstractHttpConfigurer::disable) // Deshabilitado para APIs REST stateless
+                .csrf(AbstractHttpConfigurer::disable)
+                // Política Stateless: No guardamos sesión, cada petición debe traer su token
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Acceso libre para documentación técnica y monitorización
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/actuator/health/**", "/h2-console/**").permitAll()
-                        // El resto de peticiones requieren autenticación JWT
+                        // Públicos: Salud del sistema y documentación
+                        .requestMatchers("/actuator/health/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        // Protegidos: La API de precios y las métricas detalladas (Prometheus)
+                        .requestMatchers("/api/v1/prices/**").authenticated()
+                        .requestMatchers("/actuator/prometheus").authenticated()
+                        // El resto, por seguridad, siempre autenticado
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
@@ -50,17 +49,10 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /**
-     * Decodificador de JWT para validación local.
-     * <p>
-     * En producción, este Bean se configura mediante 'spring.security.oauth2.resourceserver.jwt.issuer-uri'
-     * en el archivo application-prod.yml.
-     * </p>
-     */
     @Bean
     public JwtDecoder jwtDecoder() {
         return NimbusJwtDecoder.withSecretKey(
-                new SecretKeySpec(MOCK_SECRET.getBytes(), "HmacSHA256")
+                new SecretKeySpec(JWT_SECRET.getBytes(), "HmacSHA256")
         ).build();
     }
 }

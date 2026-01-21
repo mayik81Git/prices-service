@@ -4,20 +4,19 @@ import com.ecommerce.prices_service.domain.model.Price;
 
 import java.time.LocalDateTime;
 
+/**
+ * Puerto de entrada para el caso de uso de consulta de precios.
+ */
 public interface GetPriceUseCase {
 
     /**
-     * Ejecuta el proceso de obtención del precio final aplicable.
-     * <p>
-     * El proceso incluye la búsqueda en persistencia y la aplicación de reglas
-     * de negocio para la resolución de prioridades en rangos de fechas solapados.
-     * </p>
+     * Ejecuta la lógica de obtención del precio aplicable.
      *
-     * @param applicationDate Fecha y hora en la que se desea consultar la tarifa vigente.
-     * @param productId       Identificador único del producto objeto de la consulta.
-     * @param brandId         Identificador de la cadena o marca del grupo.
-     * @return {@link Price} El objeto de dominio con los datos de la tarifa encontrada.
-     * @throws com.ecommerce.prices_service.domain.exception.PriceNotFoundException si no hay tarifas vigentes.
+     * @param date        Fecha de aplicación de la tarifa.
+     * @param productId   Identificador del producto.
+     * @param brandId     Identificador de la cadena.
+     * @return El objeto de dominio {@link Price} con la tarifa de mayor prioridad.
+     * @throws PriceNotFoundException si no se encuentra ninguna tarifa.
      */
-    Price execute(LocalDateTime applicationDate, Long productId, Long brandId);
+    Price execute(LocalDateTime date, Long productId, Long brandId);
 }

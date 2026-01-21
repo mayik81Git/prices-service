@@ -13,4 +13,5 @@ public class BeanConfiguration {
     public GetPriceUseCase getPriceUseCase(PriceRepositoryPort priceRepositoryPort) {
         return new PriceService(priceRepositoryPort);
     }
+
 }

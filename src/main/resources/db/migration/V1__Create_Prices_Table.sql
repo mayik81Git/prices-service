@@ -11,10 +11,10 @@ CREATE TABLE prices (
     price_list INTEGER NOT NULL,
     priority INTEGER NOT NULL,
     price DECIMAL(19, 2) NOT NULL,
-    curr VARCHAR(3) NOT NULL
+    currency VARCHAR(3) NOT NULL
 );
 
 -- ÍNDICE CRÍTICO: Optimización de la consulta principal.
 -- En empresas con millones de registros, este índice permite búsquedas en milisegundos
 -- al cubrir los campos de filtrado (productId, brandId) y el rango de fechas.
-CREATE INDEX idx_prices_query_performance ON prices (product_id, brand_id, start_date, end_date);
+CREATE INDEX idx_prices_query ON prices (product_id, brand_id, start_date, end_date, priority DESC);

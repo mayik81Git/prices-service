@@ -1,39 +1,45 @@
-# Usamos una imagen con JDK 17 y Maven para construir el proyecto
-FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
+# ==========================================
+# ETAPA 1: Construcción (Build stage)
+# ==========================================
+# Usamos Java 25 y Maven 3.9 para la compilación
+FROM maven:3.9-eclipse-temurin-25 AS build
 WORKDIR /app
 
-# 1. Copiamos el archivo de configuración de Maven
+# 1. Cachear dependencias: Copiamos pom.xml primero
 COPY pom.xml .
 
-# 2. Descargamos las dependencias (se guardan en la caché de Docker)
+# 2. Descargar dependencias (optimiza la caché de capas de Docker)
 RUN mvn dependency:go-offline -B
 
-# 3. Copiamos el código fuente y compilamos el archivo JAR
+# 3. Compilar el proyecto con el perfil de producción
 COPY src ./src
 RUN mvn clean package -DskipTests -Pprod
 
 # ==========================================
 # ETAPA 2: Ejecución (Runtime stage)
 # ==========================================
-# Usamos una imagen ligera de JRE (solo ejecución) para producción
-FROM eclipse-temurin:17-jre-alpine
+# Usamos el JRE 25 ligero para reducir el tamaño de la imagen y la superficie de ataque
+FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
-# SEGURIDAD: Creamos un usuario de sistema para no ejecutar como root
-RUN addgroup -S spring && adduser -S spring -G spring
-USER spring:spring
+# SEGURIDAD: Usuario no-root siguiendo el principio de menor privilegio
+RUN addgroup -S pricesgroup && adduser -S pricesuser -G pricesgroup
+USER pricesuser:pricesgroup
 
-# Copiamos el JAR generado en la etapa anterior
+# Copiamos el JAR desde la etapa de construcción
 COPY --from=build /app/target/*.jar app.jar
 
-# Configuración de rendimiento de la JVM para 2026
-# - MaxRAMPercentage: Adapta el uso de RAM al límite asignado por Docker/K8s
+# - MaxRAMPercentage: Optimizado para contenedores en K8s.
+# - Virtual Threads: Java 25 gestiona nativamente la escalabilidad.
+# - ZGC: Usamos Generational ZGC (estándar en Java 25) para latencias ultra-bajas (<1ms).
 ENTRYPOINT ["java", \
             "-XX:+UseContainerSupport", \
             "-XX:MaxRAMPercentage=75.0", \
-            "--add-opens", "java.base/java.lang=ALL-UNNAMED", \
+            "-XX:+UseZGC", \
+            "-XX:+ZGenerational", \
             "-Dspring.profiles.active=prod", \
+            "-Djava.security.egd=file:/dev/./urandom", \
             "-jar", "app.jar"]
 
-# Exponemos el puerto del microservicio
+# Exponemos el puerto estándar del microservicio
 EXPOSE 8080

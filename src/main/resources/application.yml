@@ -1,27 +1,22 @@
 spring:
-  application:
-    name: prices-service
-  profiles:
-    active: local # Perfil por defecto
+  threads:
+    virtual:
+      enabled: true
 
   datasource:
-    url: jdbc:h2:mem:prices_db;DB_CLOSE_DELAY=-1;CASE_INSENSITIVE_IDENTIFIERS=TRUE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-
-  jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
-    hibernate:
-      ddl-auto: validate
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      pool-name: PricesHikariPool
 
 server:
+  shutdown: graceful # Para un cierre limpio en Kubernetes
   port: 8080
+
+resilience4j:
+  bulkhead:
+    instances:
+      priceService:
+        # Usamos SEMAPHORE porque los hilos virtuales no necesitan un pool físico extra
+        type: SEMAPHORE
+        maxConcurrentCalls: 50 # Debe alinearse con el pool de Hikari

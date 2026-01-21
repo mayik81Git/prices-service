@@ -42,6 +42,6 @@ public class PriceEntity {
     @Column(name = "price")
     private BigDecimal price;
 
-    @Column(name = "curr")
-    private String curr;
+    @Column(name = "currency")
+    private String currency;
 }
