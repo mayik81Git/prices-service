@@ -23,13 +23,6 @@ spring:
       connection-timeout: 30000
       max-lifetime: 1200000
 
-  # 3. SEGURIDAD OAUTH2 / JWT
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${AUTH_ISSUER_URI:https://auth.ecommerce.com}
-
   # 4. CONFIGURACIÓN JPA / HIBERNATE
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
@@ -68,9 +61,6 @@ resilience4j:
 server:
   port: 8080
   shutdown: graceful # Para despliegues sin caída en Kubernetes
-  error:
-    include-message: never
-    include-stacktrace: never
 
 # 7. OBSERVABILIDAD (ACTUATOR)
 management:
@@ -82,3 +72,7 @@ management:
     health:
       probes:
         enabled: true
+
+logging:
+  level:
+    org.springframework.security: TRACE

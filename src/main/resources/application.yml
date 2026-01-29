@@ -20,3 +20,9 @@ resilience4j:
         # Usamos SEMAPHORE porque los hilos virtuales no necesitan un pool físico extra
         type: SEMAPHORE
         maxConcurrentCalls: 50 # Debe alinearse con el pool de Hikari
+
+logging:
+  level:
+    org:
+      springframework:
+        security=DEBUG:
